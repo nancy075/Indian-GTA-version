@@ -1,0 +1,74 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --glass: rgba(18, 18, 28, 0.55);
+  --line: rgba(255, 255, 255, 0.09);
+  --gold: #ffd166;
+  --accent: #ff5c38;
+}
+html, body { height: 100%; overflow: hidden; background: #0b0d16;
+  font-family: "Inter", system-ui, "Segoe UI", sans-serif; color: #f4f1ea; }
+canvas.webgl { position: fixed; inset: 0; display: block; }
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+#hud { position: fixed; top: 14px; right: 14px; display: flex; flex-direction: column; gap: 10px; z-index: 5; pointer-events: none; align-items: flex-end; }
+#status-panel { padding: 12px 16px; min-width: 250px; text-align: right; }
+#stars { font-size: 20px; letter-spacing: 4px; color: var(--gold); }
+#stars .dim { color: rgba(255, 255, 255, 0.18); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 2px; }
+#money { font-size: 22px; font-weight: 800; color: #7dd87d; }
+.chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: rgba(255, 209, 102, 0.14);
+  border: 1px solid rgba(255, 209, 102, 0.35); color: #ffe1a0; }
+#healthwrap { margin-top: 9px; height: 9px; background: rgba(255, 255, 255, 0.1); border-radius: 5px; overflow: hidden; }
+#health { height: 100%; width: 100%; border-radius: 5px; background: linear-gradient(90deg, #6ecc6e, #a3e29f);
+  transition: width 0.2s; }
+#vehwrap { display: none; margin-top: 5px; height: 7px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; }
+#vehbar { height: 100%; width: 100%; border-radius: 4px; background: linear-gradient(90deg, #4aa3ff, #8ec9ff); transition: width 0.2s; }
+
+#mission-card { padding: 11px 14px; max-width: 320px; border-left: 3px solid var(--gold); }
+.mc-title { font-size: 10px; letter-spacing: 2.5px; font-weight: 700; color: #c9c2b4; margin-bottom: 4px; }
+#mission { font-size: 14px; line-height: 1.45; color: #fdf6e3; }
+
+#minimapwrap { position: fixed; left: 16px; bottom: 16px; padding: 5px; z-index: 5; border-radius: 50%; }
+#minimap { display: block; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.25), 0 8px 30px rgba(0, 0, 0, 0.5); }
+
+#bigmsg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 58px; font-weight: 900; font-style: italic; letter-spacing: 3px; text-transform: uppercase;
+  color: #fff; text-shadow: 0 6px 26px rgba(0, 0, 0, 0.8); z-index: 6; pointer-events: none; }
+#submsg { position: fixed; left: 0; right: 0; top: 61%; text-align: center; font-size: 17px; color: #ffe1a0;
+  text-shadow: 0 2px 8px #000; z-index: 6; pointer-events: none; }
+#toasts { position: fixed; left: 16px; bottom: 260px; display: flex; flex-direction: column; gap: 6px; z-index: 5; pointer-events: none; }
+#toasts div { padding: 7px 12px; font-size: 13px; font-weight: 600; border-radius: 10px;
+  background: var(--glass); border: 1px solid var(--line); animation: toast 1.6s forwards; }
+@keyframes toast { 0% { opacity: 0; transform: translateY(8px); } 12% { opacity: 1; transform: none; }
+  75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6px); } }
+
+#help { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); padding: 8px 18px;
+  font-size: 12.5px; color: #d8d2c4; z-index: 5; white-space: nowrap; }
+
+#intro { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(rgba(13, 10, 18, 0.5), rgba(13, 10, 18, 0.72)); }
+#intro .panel { text-align: center; padding: 44px 54px; border-radius: 22px;
+  background: rgba(16, 14, 24, 0.6); border: 1px solid var(--line);
+  backdrop-filter: blur(16px); box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6); }
+#intro h1 { font-size: 62px; font-weight: 900; letter-spacing: 1px;
+  background: linear-gradient(100deg, #ffd166 15%, #ff5c38 60%, #c026d3 90%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+#intro h1 span { background: linear-gradient(100deg, #34d399, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#intro h1 em { font-size: 24px; vertical-align: super; color: #fff; -webkit-text-fill-color: #fff; }
+#intro .tag { margin: 12px 0 20px; color: #cfc7b8; font-size: 15.5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 26px; }
+#intro button { font-size: 19px; font-weight: 800; letter-spacing: 0.5px; padding: 13px 42px; border: none;
+  border-radius: 12px; cursor: pointer; color: #1a1205;
+  background: linear-gradient(100deg, #ffd166, #ff9f1c);
+  box-shadow: 0 10px 30px rgba(255, 159, 28, 0.35); transition: transform 0.1s; }
+#intro button:hover { transform: translateY(-2px); }
+#intro button:active { transform: translateY(1px); }
+#intro .tiny { margin-top: 20px; font-size: 12px; color: #97907f; }

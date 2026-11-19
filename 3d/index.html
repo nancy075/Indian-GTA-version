@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>INDIA DRIVE 3D — Mumbai Open World</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="hud">
+    <div class="glass" id="status-panel">
+      <div id="stars"></div>
+      <div class="row">
+        <span id="money">₹0</span>
+        <span id="level" class="chip">Lv 1 · STREET NOODLE</span>
+      </div>
+      <div id="healthwrap"><div id="health"></div></div>
+      <div id="vehwrap"><div id="vehbar"></div></div>
+    </div>
+    <div class="glass" id="mission-card">
+      <div class="mc-title">📋 JOB</div>
+      <div id="mission"></div>
+    </div>
+  </div>
+  <div class="glass" id="minimapwrap"><canvas id="minimap" width="200" height="200"></canvas></div>
+  <div id="bigmsg"></div>
+  <div id="submsg"></div>
+  <div id="toasts"></div>
+  <div id="help" class="glass">WASD move · SPACE shoot / handbrake · E enter/exit · H horn · R radio · V city view · M sound · P pause</div>
+
+  <div id="intro">
+    <div class="panel">
+      <h1>INDIA <span>DRIVE</span> <em>3D</em></h1>
+      <p class="tag">मुंबई आपका है — a low-poly open-world Mumbai. Steal cars. Level up. Outrun the law.</p>
+      <div class="chips">
+        <span class="chip">📦 Parcel runs</span>
+        <span class="chip">🚕 Taxi fares (Lv 3)</span>
+        <span class="chip">🏦 Heists (Lv 4)</span>
+        <span class="chip">🎨 Pay-N-Spray</span>
+        <span class="chip">☕ Chai heal</span>
+        <span class="chip">🌆 Day/night</span>
+        <span class="chip">💥 SPACE = pistol (auto-aim)</span>
+        <span class="chip">🔥 SPACE = handbrake in car</span>
+        <span class="chip">🚗 Vehicle damage + explosions</span>
+        <span class="chip">👮 Cops fight back at 2★</span>
+        <span class="chip">📻 Desi radio (R)</span>
+      </div>
+      <button id="startBtn">▶ START ENGINE</button>
+      <p class="tiny">WASD move · SPACE shoot / handbrake · E enter/exit (carjack = +1★) · H horn · R radio · V city view · M mute · P pause</p>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener("error", (e) => {
+      const d = document.createElement("div");
+      d.style.cssText = "position:fixed;left:12px;bottom:12px;z-index:99;max-width:60vw;background:#2a0d0d;color:#ffb4b4;border:1px solid #7a2222;border-radius:10px;padding:10px 14px;font:12.5px monospace;overflow:auto;max-height:40vh;";
+      d.textContent = "JS error: " + (e.message || "unknown") + (e.filename ? " @ " + e.filename.split("/").pop() + ":" + e.lineno : "");
+      document.body.appendChild(d);
+      setTimeout(() => d.remove(), 15000);
+    });
+    if (location.protocol === "file:") {
+      window.addEventListener("DOMContentLoaded", () => {
+        const d = document.createElement("div");
+        d.style.cssText = "position:fixed;inset:0;z-index:99;background:#0d0a12;color:#ffd977;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:18px;line-height:2;";
+        d.innerHTML = "<div><b style='font-size:24px'>3D version needs a local server</b><br><br>" +
+          "In a terminal, inside the game folder run:<br><br>" +
+          "<code style='background:#241c2c;padding:8px 16px;border-radius:8px'>npx serve .</code> &nbsp;or&nbsp; " +
+          "<code style='background:#241c2c;padding:8px 16px;border-radius:8px'>python3 -m http.server 8000</code><br><br>" +
+          "Then open <b>http://localhost:3000/3d/</b> (or :8000/3d/) in your browser.<br>" +
+          "<span style='color:#97907f'>(Browsers block ES modules on file:// pages — that's why it looks blank.)</span><br><br>" +
+          "Want to right now? The <b>2D game still works</b> — open index.html at the root.</div>";
+        document.body.appendChild(d);
+      });
+    }
+  </script>
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

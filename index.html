@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>INDIA DRIVE — Apna Open-World Prototype</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div id="stars"></div>
+    <div id="money">₹0</div>
+    <div id="level"></div>
+    <div id="mission"></div>
+    <div id="healthwrap"><div id="health"></div></div>
+  </div>
+  <canvas id="minimap" width="200" height="200"></canvas>
+  <div id="bigmsg"></div>
+  <div id="submsg"></div>
+  <div id="help">WASD: move &amp; drive · SHIFT: sprint · E: enter/exit vehicle · H: horn · M: sound on/off · P: pause</div>
+
+  <div id="intro">
+    <div class="panel">
+      <h1>INDIA <span>DRIVE</span></h1>
+      <p class="tag">आपका शहर · आपकी कहानी — a tiny top-down open-world city, totally Indian.</p>
+      <ul>
+        <li>🛺 Steal autos, cars, trucks &amp; scooters — <code>H</code> to honk</li>
+        <li>📦 Run parcel missions for paisa · <code>☕</code> chai stalls heal</li>
+        <li>🚔 Hit people and the police come — stars go up</li>
+        <li>🎨 Pay-N-Spray clears your wanted level for ₹300</li>
+        <li>🌆 Day-night cycle with headlights · press <code>M</code> for sound</li>
+      </ul>
+      <button id="startBtn">▶ START ENGINE</button>
+      <p class="tiny">WASD / Arrows to move · SHIFT sprint · E enter/exit vehicle · E near a moving vehicle = carjack</p>
+    </div>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
