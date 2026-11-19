@@ -78,3 +78,23 @@ the roads and streetlamps glow at intersections.
 Smoke-tested headlessly with a DOM/canvas stub (`node tests` style harness in development).
 All game logic lives in `js/game.js` (~700 lines) — tweak `TILE`, `ROAD_STEP`,
 `VEH` speeds or police scalars at the top of the file to tune the city.
+
+## 🕹 Two versions
+
+| | 2D (this folder) | 3D (`/3d/`) |
+|---|---|---|
+| Tech | Vanilla Canvas | Three.js (CDN, no build) |
+| View | Top-down GTA1-style | Low-poly chase-cam GTA-style |
+| Feature set | Full (missions, levels, cops, services, day/night) | Same logic, 3D world |
+
+### Run the 3D version
+ES modules need a server (and internet for the three.js CDN):
+
+```bash
+npx serve .              # open http://localhost:3000/3d/
+# or
+python3 -m http.server 8000   # open http://localhost:8000/3d/
+```
+
+3D extras: chase camera, instanced buildings with warm Mumbai palette,
+glowing mission beacons, headlights + streetlamps at night, glass HUD.

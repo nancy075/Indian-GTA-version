@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>INDIA DRIVE 3D — Mumbai Open World</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="hud">
+    <div class="glass" id="status-panel">
+      <div id="stars"></div>
+      <div class="row">
+        <span id="money">₹0</span>
+        <span id="level" class="chip">Lv 1 · STREET NOODLE</span>
+      </div>
+      <div id="healthwrap"><div id="health"></div></div>
+    </div>
+    <div class="glass" id="mission-card">
+      <div class="mc-title">📋 JOB</div>
+      <div id="mission"></div>
+    </div>
+  </div>
+  <div class="glass" id="minimapwrap"><canvas id="minimap" width="200" height="200"></canvas></div>
+  <div id="bigmsg"></div>
+  <div id="submsg"></div>
+  <div id="toasts"></div>
+  <div id="help" class="glass">WASD drive/walk · SHIFT sprint · E enter/exit · H horn · M sound · P pause</div>
+
+  <div id="intro">
+    <div class="panel">
+      <h1>INDIA <span>DRIVE</span> <em>3D</em></h1>
+      <p class="tag">मुंबई आपका है — a low-poly open-world Mumbai. Steal cars. Level up. Outrun the law.</p>
+      <div class="chips">
+        <span class="chip">📦 Parcel runs</span>
+        <span class="chip">🚕 Taxi fares (Lv 3)</span>
+        <span class="chip">🏦 Heists (Lv 4)</span>
+        <span class="chip">🎨 Pay-N-Spray</span>
+        <span class="chip">☕ Chai heal</span>
+        <span class="chip">🌆 Day/night</span>
+      </div>
+      <button id="startBtn">▶ START ENGINE</button>
+      <p class="tiny">WASD move · SHIFT sprint · E enter/exit (carjack = +1★) · H horn · M mute · P pause</p>
+    </div>
+  </div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.170.0/build/three.module.js" } }
+  </script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
