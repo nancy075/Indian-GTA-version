@@ -94,7 +94,9 @@ renderer.domElement.classList.add("webgl");
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x8ec9ef, 150, 520);
+scene.fog = new THREE.Fog(0x8ec9ef, 220, 950);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 1400);
 
 const hemi = new THREE.HemisphereLight(0xbde4ff, 0x8d7b5f, 0.95);
@@ -150,7 +152,27 @@ scene.add(ground);
   scene.add(mesh);
 })();
 
+// window-grid texture shared by all buildings
+function buildingTexture() {
+  const c = document.createElement("canvas");
+  c.width = 64; c.height = 128;
+  const g2 = c.getContext("2d");
+  g2.fillStyle = "#f2ede4";
+  g2.fillRect(0, 0, 64, 128);
+  for (let y = 6; y < 128; y += 14) {
+    for (let x = 6; x < 64; x += 16) {
+      g2.fillStyle = Math.random() < 0.22 ? "#cfe3f7" : "#26273a";
+      g2.fillRect(x, y, 9, 8);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 5);
+  return tex;
+}
+
 // buildings (instanced boxes, warm palette)
+let buildingsInst;
 (function buildBuildings() {
   const list = [];
   for (let cr = 0; cr < ROWS; cr++) {
@@ -161,7 +183,8 @@ scene.add(ground);
     }
   }
   const geo = new THREE.BoxGeometry(1, 1, 1);
-  const mat = new THREE.MeshLambertMaterial();
+  const tex = buildingTexture();
+  const mat = new THREE.MeshLambertMaterial({ map: tex });
   const inst = new THREE.InstancedMesh(geo, mat, list.length);
   inst.castShadow = true;
   inst.receiveShadow = true;
@@ -173,6 +196,53 @@ scene.add(ground);
     inst.setColorAt(i, b.c);
   });
   scene.add(inst);
+  buildingsInst = inst;
+})();
+
+// street lamps
+const lampHeadMat = new THREE.MeshStandardMaterial({ color: 0x2c2c24, emissive: 0xffd977, emissiveIntensity: 0 });
+(function buildLamps() {
+  const spots = [];
+  for (const cx of CENTER_LINES) for (const cy of CENTER_LINES) {
+    spots.push([cx - 46, cy - 46], [cx + 46, cy + 46]);
+  }
+  const poleG = new THREE.CylinderGeometry(0.4, 0.55, 17, 6);
+  const headG = new THREE.SphereGeometry(1.5, 8, 6);
+  const poleM = new THREE.MeshLambertMaterial({ color: 0x3a3f4a });
+  const poles = new THREE.InstancedMesh(poleG, poleM, spots.length);
+  const heads = new THREE.InstancedMesh(headG, lampHeadMat, spots.length);
+  const m4 = new THREE.Matrix4();
+  spots.forEach(([x, y], i) => {
+    m4.identity(); m4.setPosition(x, 8.5, y);
+    poles.setMatrixAt(i, m4);
+    m4.setPosition(x, 17.5, y);
+    heads.setMatrixAt(i, m4);
+  });
+  scene.add(poles); scene.add(heads);
+})();
+
+// trees on plazas
+(function buildTrees() {
+  const spots = [];
+  for (let cr = 0; cr < ROWS; cr++) for (let cc = 0; cc < COLS; cc++) {
+    if (grid[gi(cc, cr)] === T_PLAZA && (cc + cr) % 2 === 0)
+      spots.push({ x: cc * TILE + 10 + Math.random() * 20, y: cr * TILE + 10 + Math.random() * 20, h: 6 + Math.random() * 4 });
+  }
+  const trunkG = new THREE.CylinderGeometry(0.7, 0.9, 5, 5);
+  const trunkM = new THREE.MeshLambertMaterial({ color: 0x6b4a2f });
+  const leafG = new THREE.ConeGeometry(4.5, 9, 7);
+  const leafM = new THREE.MeshLambertMaterial({ color: 0x2f7d3a });
+  const trunks = new THREE.InstancedMesh(trunkG, trunkM, spots.length);
+  const leaves = new THREE.InstancedMesh(leafG, leafM, spots.length);
+  leaves.castShadow = true;
+  const m4 = new THREE.Matrix4();
+  spots.forEach((s, i) => {
+    m4.identity(); m4.setPosition(s.x, 2.5, s.y);
+    trunks.setMatrixAt(i, m4);
+    m4.setPosition(s.x, 5 + s.h / 2, s.y);
+    leaves.setMatrixAt(i, m4);
+  });
+  scene.add(trunks); scene.add(leaves);
 })();
 
 // landmarks: gold bank + temple spires at some plazas
@@ -390,6 +460,8 @@ function toast(g, text) {
 }
 // ---------------- input ----------------
 const keys = {};
+let camMode = "chase";   // "chase" | "top"
+const ray = new THREE.Raycaster();
 const input = { up: false, down: false, left: false, right: false, sprint: false, enter: false, horn: false };
 function readInput() {
   input.up = !!(keys["w"] || keys["arrowup"]);
@@ -405,6 +477,7 @@ addEventListener("keydown", (e) => {
   if (k === "e" && g.mode === "play") input.enter = true;
   if (k === "h" && g.mode === "play") input.horn = true;
   if (k === "m") toggleMute(g);
+  if (k === "v") { camMode = camMode === "chase" ? "top" : "chase"; toast(g, camMode === "top" ? "CITY VIEW" : "CHASE CAM"); }
   if (k === "p" && g.mode !== "intro") { g.mode = g.mode === "play" ? "pause" : "play"; toast(g, g.mode === "pause" ? "PAUSED" : "RESUMED"); }
 });
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
@@ -418,6 +491,7 @@ addEventListener("resize", () => {
 const g = createGame();
 populate(g);
 const clock = new THREE.Clock();
+const bgCol = new THREE.Color(0x8ec9ef);
 const camPos = new THREE.Vector3(g.player.x, 30, g.player.y + 40);
 
 function frame() {
@@ -436,8 +510,10 @@ function frame() {
 
   // day/night
   const night = g.night;
-  scene.background = new THREE.Color().setRGB(0.56 * (1 - night) + 0.03, 0.79 * (1 - night) + 0.045, 0.94 * (1 - night) + 0.14);
-  scene.fog.color.copy(scene.background);
+  bgCol.setRGB(0.56 * (1 - night) + 0.03, 0.79 * (1 - night) + 0.045, 0.94 * (1 - night) + 0.14);
+  scene.background = bgCol;
+  scene.fog.color.copy(bgCol);
+  lampHeadMat.emissiveIntensity = night * 2.2;
   hemi.intensity = 0.95 * (1 - night) + 0.18;
   sun.intensity = 1.3 * (1 - night) + 0.05;
   sun.position.set(px + 120 * (1 - night) + 20, 190, py + 80);
@@ -456,11 +532,27 @@ function frame() {
   }
 
   // player vehicle highlight: beacon above player car handled by arrow; camera:
-  const back = inCar ? 26 : 14, up = inCar ? 12 : 7;
-  const desired = new THREE.Vector3(px - Math.cos(ang) * back, up, py - Math.sin(ang) * back);
-  camPos.lerp(desired, 1 - Math.pow(0.0001, dt));
-  camera.position.copy(camPos);
-  camera.lookAt(px + Math.cos(ang) * 8, 2, py + Math.sin(ang) * 8);
+  if (g.mode !== "play") {
+    const a = performance.now() * 0.00006;
+    camera.position.set(WORLD_W / 2 + Math.cos(a) * 620, 380, WORLD_H / 2 + Math.sin(a) * 620);
+    camera.lookAt(WORLD_W / 2, 0, WORLD_H / 2);
+  } else if (camMode === "top") {
+    camPos.lerp(new THREE.Vector3(px, 640, py + 40), 1 - Math.pow(0.001, dt));
+    camera.position.copy(camPos);
+    camera.lookAt(px, 0, py);
+  } else {
+    const back = inCar ? 27 : 13, up = inCar ? 11.5 : 6.5;
+    const target = new THREE.Vector3(px, 2, py);
+    const desired = new THREE.Vector3(px - Math.cos(ang) * back, up, py - Math.sin(ang) * back);
+    ray.set(target, desired.clone().sub(target).normalize());
+    ray.far = back + 2;
+    const hits = ray.intersectObject(buildingsInst, false);
+    let d = back;
+    if (hits.length && hits[0].distance < back) d = Math.max(4, hits[0].distance * 0.8);
+    camPos.lerp(new THREE.Vector3(px - Math.cos(ang) * d, up + (back - d) * 0.25, py - Math.sin(ang) * d), 1 - Math.pow(0.005, dt));
+    camera.position.copy(camPos);
+    camera.lookAt(px + Math.cos(ang) * 10, 2.2, py + Math.sin(ang) * 10);
+  }
 
   // beacons
   if (tgt) {

@@ -98,5 +98,8 @@ npx serve .              # open http://localhost:3000/3d/
 python3 -m http.server 8000   # open http://localhost:8000/3d/
 ```
 
-3D extras: chase camera, instanced buildings with warm Mumbai palette,
-glowing mission beacons, headlights + streetlamps at night, glass HUD.
+3D extras: cinematic city flyover on the start screen (`V` toggles a full
+top-down city view), occlusion-aware chase camera that never clips through
+buildings, instanced buildings with window textures, street lamps + trees,
+filmic tone mapping, glowing mission beacons, headlights & fond streetlamps
+at night, glass HUD.
