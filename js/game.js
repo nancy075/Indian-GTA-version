@@ -331,6 +331,7 @@ function resetPlayer(afterBusted) {
   player.health = 100;
   state.wanted = 0;
   state.bustTimer = 0;
+  if (mission) { mission = null; missionCd = 5; }
   cops = []; copCars = [];
   if (afterBusted) {
     player.money = Math.max(0, player.money - 150);
@@ -339,21 +340,103 @@ function resetPlayer(afterBusted) {
 }
 
 // ---------------- game state ----------------
-const state = { wanted: 0, crimeCd: 0, bustTimer: 0, mode: "intro", bigT: 0, missionsDone: 0 };
+const state = { wanted: 0, crimeCd: 0, bustTimer: 0, mode: "intro", bigT: 0, missionsDone: 0, level: 1, toNext: 2 };
 let mission = null, missionCd = 2;
 
+const TITLES = ["STREET NOODLE", "RICKSHAW RAJA", "AUTO WALA ACE", "GULLY GANGSTA", "AREA KA DON", "MUMBAI KA BADSHAH"];
+const BANK = { x: CENTER_LINES[1], y: CENTER_LINES[5] + 46 };
+const HIDEOUT = SPOTS[12] || SPOTS[0];
+
+function fmtTime(s) {
+  s = Math.max(0, Math.ceil(s));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+function titleFor(level) { return TITLES[Math.min(level - 1, TITLES.length - 1)]; }
+
 function newMission() {
-  const far = (s) => dist(s.x, s.y, player.x, player.y) > 550;
-  const cand = SPOTS.filter(far);
-  mission = { phase: "pickup", to: pick(cand), reward: 350 };
+  const lvl = state.level;
+  const minD = 400 + lvl * 80;
+  const cand = SPOTS.filter((s) => dist(s.x, s.y, player.x, player.y) > minD);
+  const to = cand.length ? pick(cand) : pick(SPOTS);
+  const types = ["parcel", "parcel"];
+  if (lvl >= 3) types.push("taxi");
+  if (lvl >= 4) types.push("heist", "heist");
+  const type = pick(types);
+  mission = { type, phase: "pickup", to, reward: 0, timeLeft: 0, totalTime: 0 };
+  if (type === "parcel") {
+    mission.reward = 350 + lvl * 100;
+    if (lvl >= 2) { mission.timeLeft = mission.totalTime = 55 + lvl * 5; }
+  } else if (type === "taxi") {
+    mission.reward = 450 + lvl * 100;
+    mission.timeLeft = mission.totalTime = 75 + lvl * 5;
+  } else {
+    mission.phase = "gotoBank";
+    mission.to = BANK;
+    mission.reward = 900 + lvl * 200;
+  }
   setMissionText();
 }
+function timerStr() { return mission.timeLeft > 0 ? "  \u23f1" + fmtTime(mission.timeLeft) : ""; }
 function setMissionText() {
-  $("mission").textContent = mission
-    ? (mission.phase === "pickup" ? "📦 Parcel mission: pick up the parcel (yellow marker)"
-                                 : "📦 Deliver the parcel (blue marker) — ₹" + mission.reward)
-    : "New parcel mission in " + Math.ceil(missionCd) + "s…";
+  let txt;
+  if (!mission) {
+    txt = "New job in " + Math.ceil(missionCd) + "s\u2026  (Lv " + state.level + ")";
+  } else if (mission.type === "parcel") {
+    txt = mission.phase === "pickup"
+      ? "\ud83d\udce6 Parcel: pick up (yellow)" + timerStr()
+      : "\ud83d\udce6 Deliver (blue) \u2014 \u20b9" + mission.reward + timerStr();
+  } else if (mission.type === "taxi") {
+    txt = mission.phase === "pickup"
+      ? "\ud83d\ude95 Taxi: pick up the passenger (green) \u2014 you need a vehicle"
+      : "\ud83d\ude95 Drop the passenger (teal) \u2014 \u20b9" + mission.reward + timerStr();
+  } else {
+    txt = mission.phase === "escape"
+      ? "\ud83c\udfe6 ESCAPE to the hideout (purple) \u2014 \u20b9" + mission.reward + "  \u23f1" + fmtTime(mission.timeLeft)
+      : "\ud83c\udfe6 HEIST: reach the City Bank (red)";
+  }
+  $("mission").textContent = txt;
 }
+function missionColor() {
+  if (!mission) return "#ffd400";
+  if (mission.type === "taxi") return mission.phase === "pickup" ? "#2ecc71" : "#1abc9c";
+  if (mission.type === "heist") return mission.phase === "escape" ? "#b07cff" : "#ff4d4d";
+  return mission.phase === "pickup" ? "#ffd400" : "#3aa0ff";
+}
+function missionLabel() {
+  if (!mission) return "";
+  if (mission.type === "taxi") return mission.phase === "pickup" ? "\ud83d\ude95 PICK UP PASSENGER" : "\ud83d\ude95 DROP PASSENGER";
+  if (mission.type === "heist") return mission.phase === "escape" ? "\ud83c\udfe6 RUN TO HIDEOUT" : "\ud83c\udfe6 CITY BANK";
+  return mission.phase === "pickup" ? "\ud83d\udce6 PICK UP" : "\ud83c\udfc1 DELIVER";
+}
+function completeMission() {
+  let sub = "+\u20b9" + mission.reward + " \u00b7 " + state.missionsDone + " jobs done";
+  if (mission.totalTime > 0 && mission.timeLeft > mission.totalTime * 0.45) {
+    player.money += 250;
+    sub += "  (+\u20b9250 time bonus!)";
+  }
+  player.money += mission.reward;
+  state.missionsDone++;
+  cashSound();
+  showBig("JOB DONE!", sub, 2.2);
+  state.toNext--;
+  if (state.toNext <= 0) {
+    state.level++;
+    state.toNext = 2 + state.level;
+    showBig("LEVEL UP!", "You are now: " + titleFor(state.level), 2.8);
+    beep(660, 0.12, "square", 0.14);
+    beep(880, 0.12, "square", 0.14, 0.12);
+    beep(1320, 0.2, "square", 0.14, 0.26);
+  }
+  mission = null;
+  missionCd = 4;
+}
+function failMission() {
+  showBig("JOB FAILED", "Too slow, the client went elsewhere", 2.2);
+  mission = null;
+  missionCd = 4;
+}
+
+function newMissionEnd() {}
 function addWanted(n, msg) {
   const before = Math.floor(state.wanted);
   state.wanted = clamp(state.wanted + n, 0, 5);
@@ -701,24 +784,41 @@ function missionUpdate(dt) {
     if (missionCd <= 0) newMission();
     return;
   }
-  const t = mission.to;
-  if (dist(player.x, player.y, t.x, t.y) < 34) {
-    if (mission.phase === "pickup") {
-      const far = SPOTS.filter((s) => dist(s.x, s.y, t.x, t.y) > 550);
-      mission.phase = "drop";
-      mission.to = pick(far);
-      cashSound();
-      showBig("PARCEL PICKED UP", "Now deliver it", 1.4);
-      setMissionText();
-    } else {
-      player.money += mission.reward;
-      state.missionsDone++;
-      cashSound();
-      showBig("MISSION COMPLETE", "+₹" + mission.reward + " · total " + state.missionsDone + " deliveries", 2.2);
-      mission = null;
-      missionCd = 4;
-    }
+  if (mission.timeLeft > 0) {
+    mission.timeLeft -= dt;
+    if (mission.timeLeft <= 0) { failMission(); return; }
   }
+  const t = mission.to;
+  const needVehicle = mission.type === "taxi" && mission.phase === "pickup";
+  if (dist(player.x, player.y, t.x, t.y) > (needVehicle ? 44 : 34)) return;
+  if (needVehicle && player.onFoot) {
+    if (Math.random() < 0.2) floater(t.x, t.y - 30, "GET A CAR FIRST!", "#ffffff");
+    return;
+  }
+  if (mission.type === "parcel" && mission.phase === "pickup") {
+    const far = SPOTS.filter((s) => dist(s.x, s.y, t.x, t.y) > 550);
+    mission.phase = "drop";
+    mission.to = far.length ? pick(far) : pick(SPOTS);
+    cashSound();
+    showBig("PARCEL PICKED UP", "Now deliver it", 1.4);
+  } else if (mission.type === "taxi" && mission.phase === "pickup") {
+    const far = SPOTS.filter((s) => dist(s.x, s.y, t.x, t.y) > 550);
+    mission.phase = "drop";
+    mission.to = far.length ? pick(far) : pick(SPOTS);
+    cashSound();
+    showBig("PASSENGER ABOARD", "Drive them to the destination", 1.6);
+  } else if (mission.type === "heist" && mission.phase === "gotoBank") {
+    addWanted(2.2, "BANK ROBBERY!");
+    mission.phase = "escape";
+    mission.to = HIDEOUT;
+    mission.timeLeft = mission.totalTime = 45;
+    crashSound();
+    showBig("THE LOOT IS YOURS", "Now ESCAPE to the hideout", 2);
+  } else {
+    completeMission();
+    return;
+  }
+  setMissionText();
 }
 
 // ---------------- camera / render ----------------
@@ -852,14 +952,14 @@ function render() {
   if (mission) {
     const t = mission.to;
     const pulse = 10 + Math.sin(performance.now() / 200) * 3;
-    ctx.fillStyle = mission.phase === "pickup" ? "#ffd400" : "#3aa0ff";
+    ctx.fillStyle = missionColor();
     ctx.globalAlpha = 0.35;
     ctx.beginPath(); ctx.arc(t.x, t.y, pulse + 10, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc(t.x, t.y, pulse, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#241a12";
     ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(mission.phase === "pickup" ? "📦 PICK UP" : "🏁 DELIVER", t.x, t.y - 22);
+    ctx.fillText(missionLabel(), t.x, t.y - 22);
   }
 
   const nightRaw = (1 - Math.cos((dayT / DAY_LEN) * Math.PI * 2)) / 2;
@@ -868,6 +968,7 @@ function render() {
   // service markers on the map
   drawMarker(ctx, PNS.x, PNS.y, "#2ecc71", "🎨 PAY-N-SPRAY", "₹300");
   drawMarker(ctx, CHAI.x, CHAI.y, "#ff9800", "☕ CHAI", "₹50");
+  drawMarker(ctx, BANK.x, BANK.y, "#ff4d4d", "🏦 CITY BANK", "heist · Lv 4+");
 
   for (const v of vehicles) {
     if (night > 0.12) drawHeadlight(ctx, v, night);
@@ -908,7 +1009,7 @@ function render() {
       ctx.save();
       ctx.translate(player.x + Math.cos(a) * 30, player.y + Math.sin(a) * 30);
       ctx.rotate(a);
-      ctx.fillStyle = mission.phase === "pickup" ? "#ffd400" : "#3aa0ff";
+      ctx.fillStyle = missionColor();
       ctx.beginPath();
       ctx.moveTo(10, 0); ctx.lineTo(-6, -6); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
       ctx.restore();
@@ -951,6 +1052,7 @@ function render() {
   for (let i = 0; i < 5; i++) starsTxt += i < stars ? "★" : "<span class='dim'>☆</span>";
   if ($("stars").innerHTML !== starsTxt) $("stars").innerHTML = starsTxt;
   $("money").textContent = "₹" + player.money;
+  $("level").textContent = "Lv " + state.level + " · " + titleFor(state.level) + " · " + state.toNext + " jobs to next level";
   $("health").style.width = clamp(player.health, 0, 100) + "%";
   $("health").style.background = player.health > 50 ? "#6ecc6e" : player.health > 25 ? "#e8c34a" : "#e05252";
   if (state.bustTimer > 0) $("submsg").textContent = "Getting busted… break away!";
@@ -973,7 +1075,7 @@ function drawMinimap() {
   for (const v of copCars) mctx.fillRect(v.x * s - 2, v.y * s - 2, 4, 4);
   for (const c of cops) mctx.fillRect(c.x * s - 1, c.y * s - 1, 3, 3);
   if (mission) {
-    mctx.fillStyle = mission.phase === "pickup" ? "#ffd400" : "#3aa0ff";
+    mctx.fillStyle = missionColor();
     const p = 2.5 + Math.sin(performance.now() / 180) * 1.2;
     mctx.beginPath(); mctx.arc(mission.to.x * s, mission.to.y * s, p, 0, Math.PI * 2); mctx.fill();
   }
@@ -1041,9 +1143,9 @@ function frame(now) {
   for (const d of decals) d.t -= dt;
   decals = decals.filter((d) => d.t > 0);
   peds = peds.filter((p) => !p.dead || Math.random() > 0.98);
-  while (peds.length < 34) spawnPed();
+  while (peds.length < 30 + state.level * 2) spawnPed();
   vehicles = vehicles.filter((v) => v.mode !== "traffic" || (v.x > -80 && v.x < WORLD_W + 80 && v.y > -80 && v.y < WORLD_H + 80));
-  while (vehicles.length < 46) spawnTraffic();
+  while (vehicles.length < 40 + state.level * 4) spawnTraffic();
 
   if (state.bigT > 0) {
     state.bigT -= dt;
