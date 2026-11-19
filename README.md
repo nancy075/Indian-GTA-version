@@ -1,4 +1,4 @@
-# INDIA DRIVE 🇮🇳 (Indian GTA version)
+# INDIA DRIVE 🇮🇳 
 
 A tiny **2D top-down GTA-style open-world prototype** set in a Mumbai-inspired city.
 Pure vanilla JavaScript + Canvas. **No dependencies. No build step.**
