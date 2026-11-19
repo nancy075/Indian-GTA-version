@@ -156,7 +156,7 @@ function initAudio() {
   if (AC || !(window.AudioContext || window.webkitAudioContext)) return;
   AC = new (window.AudioContext || window.webkitAudioContext)();
   master = AC.createGain();
-  master.gain.value = 0.5;
+  master.gain.value = 0.6;
   master.connect(AC.destination);
 
   sirenOsc = AC.createOscillator();
@@ -172,6 +172,30 @@ function initAudio() {
   sirenGain.gain.value = 0;
   sirenOsc.connect(sirenGain); sirenGain.connect(master);
   sirenOsc.start(); sirenLfo.start();
+  initEngineAudio();
+}
+
+let engineOsc = null, engineGain = null;
+function initEngineAudio() {
+  if (engineOsc) return;
+  engineOsc = AC.createOscillator();
+  engineOsc.type = "sawtooth";
+  engineOsc.frequency.value = 55;
+  const filt = AC.createBiquadFilter();
+  filt.type = "lowpass";
+  filt.frequency.value = 320;
+  engineGain = AC.createGain();
+  engineGain.gain.value = 0;
+  engineOsc.connect(filt); filt.connect(engineGain);
+  engineGain.connect(master);
+  engineOsc.start();
+}
+let muted = false;
+function toggleMute() {
+  if (!master) return;
+  muted = !muted;
+  master.gain.value = muted ? 0 : 0.6;
+  floater(player.x, player.y - 40, muted ? "SOUND OFF" : "SOUND ON", "#ffffff");
 }
 function beep(freq, dur, type, vol, when) {
   if (!AC) return;
@@ -197,6 +221,12 @@ function crashSound() {
 }
 function cashSound() { beep(880, 0.09, "sine", 0.15); beep(1318, 0.16, "sine", 0.15, 0.09); }
 function jepSound() { beep(220, 0.2, "sawtooth", 0.1); }
+function doHorn() {
+  honkSound();
+  hornT = 0.7;
+  for (const p of peds)
+    if (!p.dead && dist(p.x, p.y, player.x, player.y) < 150) p.flee = Math.max(p.flee, 1.0);
+}
 
 // ---------------- entities ----------------
 const DIRS = [ {x: 1, y: 0}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 0, y: -1} ];
@@ -329,7 +359,7 @@ function addWanted(n, msg) {
   state.wanted = clamp(state.wanted + n, 0, 5);
   state.crimeCd = 12;
   if (msg) floater(player.x, player.y - 40, msg, "#ff5252");
-  if (Math.floor(state.wanted) > before)HonkSirenUpdate();
+  if (Math.floor(state.wanted) > before && Math.floor(state.wanted) === 1) honkSound();
 }
 function floater(x, y, text, color) {
   floaters.push({ x, y, text, color: color || "#fff", t: 1.6 });
@@ -347,6 +377,8 @@ addEventListener("keydown", (e) => {
   keys[k] = true;
   if (e.repeat) return;
   if (k === "e" && state.mode === "play") toggleVehicle();
+  if (k === "h" && state.mode === "play") doHorn();
+  if (k === "m" && state.mode === "play") toggleMute();
   if (k === "p" && state.mode !== "intro") state.mode = state.mode === "play" ? "pause" : "play";
 });
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
@@ -369,7 +401,16 @@ function toggleVehicle() {
       if (d < bd) { bd = d; best = v; }
     }
     if (best) {
-      if (best.mode === "traffic") { addWanted(0.7, "CARJACKING!"); }
+      if (best.mode === "traffic") {
+        addWanted(1, "CAR STOLEN!");
+        peds.push({
+          x: best.x + Math.cos(best.ang + Math.PI / 2) * (best.spec.h / 2 + 12),
+          y: best.y + Math.sin(best.ang + Math.PI / 2) * (best.spec.h / 2 + 12),
+          vax: randi(0, 3), speed: rand(30, 55),
+          color: pick(["#e91e63", "#2196f3", "#ffd54f", "#4caf50"]),
+          flee: 2.5, dead: false
+        });
+      }
       best.mode = "player";
       best.speed = 0;
       player.vehicle = best; player.onFoot = false;
@@ -502,15 +543,16 @@ function trafficUpdate(v, dt) {
     if (o === v) continue;
     if (dist(o.x, o.y, px, py) < 26) {
       step *= 0.1;
-      if (o.mode === "player" && Math.random() < 0.02) {
+      if (o.mode === "player" && Math.random() < 0.09) {
         honkSound(); floater(v.x, v.y - 30, pick(HONK_WORDS), "#ffd977");
       }
     }
   }
   if (player.onFoot && dist(player.x, player.y, px, py) < 24) {
     step *= 0.1;
-    if (Math.random() < 0.015) { honkSound(); floater(v.x, v.y - 30, pick(HONK_WORDS), "#ffd977"); }
+    if (Math.random() < 0.09) { honkSound(); floater(v.x, v.y - 30, pick(HONK_WORDS), "#ffd977"); }
   }
+  if (hornT > 0 && dist(v.x, v.y, player.x, player.y) < 130) step *= 0.2;
 
   let newAlong = along + v.sign * step;
   const crossed = v.next === null || (v.sign > 0 ? newAlong >= v.next : newAlong <= v.next);
@@ -629,7 +671,26 @@ function policeUpdate(dt) {
       copCars.some((c) => dist(c.x, c.y, player.x, player.y) < 430);
     if (!nearCop) state.wanted = Math.max(0, state.wanted - dt / 7);
   }
-  HonkSirenUpdate();
+}
+
+let hornT = 0;
+// ---------------- services: pay-n-spray & chai ----------------
+const PNS = { x: CENTER_LINES[3], y: CENTER_LINES[3] + 46 };
+const CHAI = SPOTS[5] || SPOTS[0];
+function serviceUpdate() {
+  if (!player.onFoot && state.wanted > 0 && player.money >= 300 && dist(player.x, player.y, PNS.x, PNS.y) < 44) {
+    player.money -= 300;
+    state.wanted = 0;
+    state.crimeCd = 12;
+    cashSound();
+    showBig("REPAINTED!", "Pay-N-Spray cleared the wanted level (-\u20b9300)", 2);
+  }
+  if (player.onFoot && player.health < 100 && player.money >= 50 && dist(player.x, player.y, CHAI.x, CHAI.y) < 30) {
+    player.money -= 50;
+    player.health = Math.min(100, player.health + 40);
+    cashSound();
+    floater(CHAI.x, CHAI.y - 40, "CHAI +40", "#ffb74d");
+  }
 }
 
 // ---------------- update: missions ----------------
@@ -663,6 +724,8 @@ function missionUpdate(dt) {
 // ---------------- camera / render ----------------
 const canvas = $("game"), ctx = canvas.getContext("2d");
 const mini = $("minimap"), mctx = mini.getContext("2d");
+const DAY_LEN = 150;
+let dayT = DAY_LEN * 0.2;
 let camX = 0, camY = 0;
 
 function resize() {
@@ -715,6 +778,41 @@ function drawVehicle(c, v) {
   c.restore();
 }
 
+function drawMarker(c, x, y, color, label, sub) {
+  const pulse = 12 + Math.sin(performance.now() / 220) * 3;
+  c.save();
+  c.globalAlpha = 0.3;
+  c.fillStyle = color;
+  c.beginPath(); c.arc(x, y, pulse + 10, 0, Math.PI * 2); c.fill();
+  c.globalAlpha = 1;
+  c.beginPath(); c.arc(x, y, pulse, 0, Math.PI * 2); c.fill();
+  c.fillStyle = "#241a12";
+  c.font = "bold 11px sans-serif";
+  c.textAlign = "center";
+  c.fillText(label, x, y - 26);
+  c.font = "10px sans-serif";
+  c.fillText(sub, x, y - 14);
+  c.restore();
+}
+
+function drawHeadlight(c, v, night) {
+  const fx = Math.cos(v.ang), fy = Math.sin(v.ang);
+  const px = -fy, py = fx;
+  const nose = v.spec.h / 2 + 2;
+  c.save();
+  c.globalAlpha = 0.13 * night;
+  c.fillStyle = "#ffe9a8";
+  c.beginPath();
+  c.moveTo(v.x + fx * nose + px * 8, v.y + fy * nose + py * 8);
+  c.lineTo(v.x + fx * nose + px * 24, v.y + fy * nose + py * 24);
+  c.lineTo(v.x + fx * (nose + 74) + px * 44, v.y + fy * (nose + 74) + py * 44);
+  c.lineTo(v.x + fx * (nose + 74) - px * 44, v.y + fy * (nose + 74) - py * 44);
+  c.lineTo(v.x + fx * nose - px * 24, v.y + fy * nose - py * 24);
+  c.closePath();
+  c.fill();
+  c.restore();
+}
+
 function drawPed(c, p, alpha) {
   c.save();
   c.globalAlpha = alpha === undefined ? 1 : alpha;
@@ -764,8 +862,20 @@ function render() {
     ctx.fillText(mission.phase === "pickup" ? "📦 PICK UP" : "🏁 DELIVER", t.x, t.y - 22);
   }
 
-  for (const v of vehicles) drawVehicle(ctx, v);
+  const nightRaw = (1 - Math.cos((dayT / DAY_LEN) * Math.PI * 2)) / 2;
+  const night = clamp(nightRaw, 0, 1);
+
+  // service markers on the map
+  drawMarker(ctx, PNS.x, PNS.y, "#2ecc71", "🎨 PAY-N-SPRAY", "₹300");
+  drawMarker(ctx, CHAI.x, CHAI.y, "#ff9800", "☕ CHAI", "₹50");
+
+  for (const v of vehicles) {
+    if (night > 0.12) drawHeadlight(ctx, v, night);
+    drawVehicle(ctx, v);
+  }
   for (const v of copCars) {
+    if (night > 0.12) drawHeadlight(ctx, v, night);
+    drawVehicle(ctx, v);
     drawVehicle(ctx, v);
     if (Math.floor(state.wanted) >= 1) {
       ctx.save(); ctx.translate(v.x, v.y - v.spec.h / 2 - 8);
@@ -823,6 +933,18 @@ function render() {
   ctx.fillStyle = "rgba(255,140,40,0.07)";
   ctx.fillRect(0, 0, vw, vh);
 
+  // night overlay + street lamps
+  if (night > 0.05) {
+    ctx.fillStyle = `rgba(10, 14, 52, ${(night * 0.42).toFixed(3)})`;
+    ctx.fillRect(0, 0, vw, vh);
+    ctx.fillStyle = `rgba(255, 218, 120, ${(night * 0.14).toFixed(3)})`;
+    for (const cx of CENTER_LINES) for (const cy of CENTER_LINES) {
+      const sx = cx - camX, sy = cy - camY;
+      if (sx < -90 || sy < -90 || sx > vw + 90 || sy > vh + 90) continue;
+      ctx.beginPath(); ctx.arc(sx, sy, 80, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   // HUD
   const stars = Math.floor(state.wanted);
   let starsTxt = "";
@@ -843,6 +965,10 @@ function drawMinimap() {
   const s = MAP_SCALE;
   mctx.fillStyle = "#ffe08a";
   for (const v of vehicles) mctx.fillRect(v.x * s - 1, v.y * s - 1, 2, 2);
+  mctx.fillStyle = "#2ecc71";
+  mctx.fillRect(PNS.x * s - 2, PNS.y * s - 2, 4, 4);
+  mctx.fillStyle = "#ff9800";
+  mctx.fillRect(CHAI.x * s - 2, CHAI.y * s - 2, 4, 4);
   mctx.fillStyle = Math.floor(performance.now() / 250) % 2 ? "#ff4444" : "#ffaaaa";
   for (const v of copCars) mctx.fillRect(v.x * s - 2, v.y * s - 2, 4, 4);
   for (const c of cops) mctx.fillRect(c.x * s - 1, c.y * s - 1, 3, 3);
@@ -857,14 +983,33 @@ function drawMinimap() {
   mctx.beginPath(); mctx.arc(player.x * s, player.y * s, 3, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
 }
 
-// ---------------- siren control ----------------
-function HonkSirenUpdate() {
-  if (!AC) return;
+
+// ---------------- audio mixer (per-frame) ----------------
+function audioUpdate(dt) {
+  if (!AC || !sirenGain) return;
   const on = Math.floor(state.wanted) >= 1 && (cops.length + copCars.length) > 0;
-  const near = Math.min(...[...cops, ...copCars].map((c) => dist(c.x, c.y, player.x, player.y)), 9999);
-  const g = on ? (state.bigT > 0 ? 0.05 : 0.05 + 0.1 * clamp(0.2 * (1 - near / 800), 0, 1) + 0.03 * Math.floor(state.wanted)) : 0;
-  sirenGain.gain.setTargetAtTime(clamp(g, 0, 0.2), AC.currentTime, 0.2);
+  let g = 0;
+  if (on && !muted) {
+    const near = Math.min(...[...cops, ...copCars].map((c) => dist(c.x, c.y, player.x, player.y)), 9999);
+    g = 0.05 + 0.12 * clamp(1 - near / 900, 0, 1);
+  }
+  sirenGain.gain.setTargetAtTime(clamp(g, 0, 0.2), AC.currentTime, 0.25);
+  if (engineGain) {
+    if (!muted && !player.onFoot && player.vehicle) {
+      const sp = Math.abs(player.vehicle.speed);
+      engineOsc.frequency.setTargetAtTime(45 + sp * 0.5, AC.currentTime, 0.1);
+      engineGain.gain.setTargetAtTime(0.05 + clamp(sp / 400, 0, 1) * 0.06, AC.currentTime, 0.15);
+    } else {
+      engineGain.gain.setTargetAtTime(0, AC.currentTime, 0.1);
+    }
+  }
+  ambT -= dt;
+  if (ambT <= 0 && !muted) {
+    ambT = rand(3.5, 9);
+    beep(rand(430, 620), 0.22, "square", rand(0.015, 0.04));
+  }
 }
+let ambT = 5;
 
 // ---------------- main loop ----------------
 let last = performance.now();
@@ -875,15 +1020,19 @@ function frame(now) {
   if (state.mode !== "play" && state.mode !== "pause") { render(); return; }
   if (state.mode === "pause") { render(); return; }
 
+  dayT = (dayT + dt) % DAY_LEN;
+  if (hornT > 0) hornT -= dt;
   if (player.onFoot) playerFootUpdate(dt);
   else playerCarUpdate(player.vehicle, dt);
 
   for (const v of vehicles) if (v.mode === "traffic") trafficUpdate(v, dt);
   for (const p of peds) pedUpdate(p, dt);
   policeUpdate(dt);
+  serviceUpdate();
   missionUpdate(dt);
+  audioUpdate(dt);
 
-  if (!player.onFoot && Math.random() < 0.003) honkSound();
+  if (!player.onFoot && Math.random() < 0.02) honkSound();
 
   if (state.wanted === 0 && player.health < 100) player.health = Math.min(100, player.health + 5 * dt);
 
@@ -892,7 +1041,7 @@ function frame(now) {
   for (const d of decals) d.t -= dt;
   decals = decals.filter((d) => d.t > 0);
   peds = peds.filter((p) => !p.dead || Math.random() > 0.98);
-  while (peds.length < 26) spawnPed();
+  while (peds.length < 34) spawnPed();
   vehicles = vehicles.filter((v) => v.mode !== "traffic" || (v.x > -80 && v.x < WORLD_W + 80 && v.y > -80 && v.y < WORLD_H + 80));
   while (vehicles.length < 46) spawnTraffic();
 

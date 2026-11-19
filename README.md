@@ -26,8 +26,18 @@ python3 -m http.server 8000   # then open http://localhost:8000
 |-----|--------|
 | `W A S D` / Arrows | Walk / drive |
 | `SHIFT` | Sprint |
-| `E` | Enter / exit vehicle (near a moving one = carjack, +wanted) |
+| `E` | Enter / exit vehicle (near a moving one = carjack: driver thrown out, +1★) |
+| `H` | Horn — scatters pedestrians, freezes traffic (very Mumbai) |
+| `M` | Sound on/off |
 | `P` | Pause |
+
+## 🔊 Sound system
+Real-time WebAudio synth (no files):
+- Engine rumble that pitches up with speed
+- Two-tone Indian horns from you and the AI traffic (they honk when you block them)
+- Police siren with LFO wail when cops are on you
+- Distant city honks as ambient
+- Crash noise bursts, cash register blips, busted jingle
 
 ## 🌆 Mumbai flavor
 
@@ -37,6 +47,16 @@ python3 -m http.server 8000   # then open http://localhost:8000
   Chowpatty Corner…*
 - Constant two-tone honking from AI traffic that you blocking the road will trigger
 - Parcel missions between road-side stalls for ₹350 a delivery
+
+## 🎨 Services
+
+- **🎨 Pay-N-Spray** (green marker, ₹300): drive in with a wanted level — the car
+  gets resprayed and your stars go to zero
+- **☕ Chai stalls** (orange marker, ₹50): stand next to one on foot to heal +40
+
+## 🌆 Day / night
+A full cycle every ~2.5 minutes: dusk tints to deep blue night, headlights sweep
+the roads and streetlamps glow at intersections.
 
 ## 🚓 Crime & police
 
