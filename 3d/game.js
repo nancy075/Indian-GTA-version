@@ -53,12 +53,12 @@ for (let r = 0; r < ROWS; r++)
       SPOTS.push({ x: c * TILE + TILE / 2, y: r * TILE + TILE / 2 });
 const DIRS = [ { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 } ];
 export const VEH = {
-  auto:    { w: 24, h: 36, speed: 120, color: "#f2c02e", name: "Auto" },
-  car:     { w: 28, h: 40, speed: 180, colors: ["#3f6fd8", "#c0392b", "#2e8b57", "#7f8c8d"], name: "Car" },
-  truck:   { w: 32, h: 54, speed: 100, color: "#6c5ce7", name: "Truck" },
-  scooter: { w: 14, h: 26, speed: 140, color: "#e67e22", name: "Scooter" },
-  bus:     { w: 32, h: 58, speed: 105, color: "#d84315", name: "Bus" },
-  police:  { w: 28, h: 42, speed: 235, color: "#f4f4f4", name: "Police" }
+  auto:    { w: 24, h: 36, speed: 120, color: "#f2c02e", name: "Auto", hp: 60 },
+  car:     { w: 28, h: 40, speed: 180, colors: ["#3f6fd8", "#c0392b", "#2e8b57", "#7f8c8d"], name: "Car", hp: 100 },
+  truck:   { w: 32, h: 54, speed: 100, color: "#6c5ce7", name: "Truck", hp: 220 },
+  scooter: { w: 14, h: 26, speed: 140, color: "#e67e22", name: "Scooter", hp: 40 },
+  bus:     { w: 32, h: 58, speed: 105, color: "#d84315", name: "Bus", hp: 200 },
+  police:  { w: 28, h: 42, speed: 235, color: "#f4f4f4", name: "Police", hp: 130 }
 };
 
 export const TITLES = ["STREET NOODLE", "RICKSHAW RAJA", "AUTO WALA ACE", "GULLY GANGSTA", "AREA KA DON", "MUMBAI KA BADSHAH"];
@@ -99,7 +99,7 @@ export function createGame() {
     hideout: SPOTS[12] || SPOTS[0],
     pns: { x: CENTER_LINES[3], y: CENTER_LINES[3] + 46 },
     chai: SPOTS[5] || SPOTS[0],
-    hornT: 0, ambT: 5, dayT: 30, DAY_LEN: 150, night: 0,
+    hornT: 0, ambT: 5, dayT: 30, DAY_LEN: 150, night: 0, fireCd: 0, copShootCd: 0,
     events: [], time: 0
   };
   return g;
@@ -135,7 +135,7 @@ export function spawnTraffic(g, typeName) {
   const v = {
     type: typeName, spec, axis, sign, base,
     x: 0, y: 0, ang: 0, speed: spec.speed * rand(0.85, 1.1),
-    mode: "traffic", next: null, targetAng: 0,
+    mode: "traffic", next: null, targetAng: 0, hp: spec.hp,
     bodyColor: spec.colors ? pick(spec.colors) : spec.color
   };
   const lane = base + laneOffsetFor(axis, sign);
@@ -259,7 +259,7 @@ function spawnCopCar(g) {
   const lane = base + laneOffsetFor(axis, sign);
   g.copCars.push({
     type: "police", spec, x: axis === "x" ? pos : lane, y: axis === "y" ? pos : lane,
-    ang: angFor(axis, sign), speed: 0, hitCd: 0
+    ang: angFor(axis, sign), speed: 0, hitCd: 0, hp: spec.hp,
   });
 }
 function resetPlayer(g, afterBusted) {
@@ -298,6 +298,7 @@ function policeUpdate(g, dt) {
   }
 
   for (const v of g.copCars) {
+    if (v.mode === "wrecked" || v.mode === "remove") continue;
     if (v.hitCd > 0) v.hitCd -= dt;
     const maxV = 235 + stars * 15;
     const ang = Math.atan2(g.player.y - v.y, g.player.x - v.x);
@@ -331,7 +332,7 @@ export function toggleVehicle(g) {
   if (p.onFoot) {
     let best = null, bd = 55;
     for (const v of g.vehicles.concat(g.copCars)) {
-      if (v.mode === "police") continue;
+      if (v.mode === "police" || v.mode === "wrecked" || v.mode === "remove") continue;
       const d = dist(v.x, v.y, p.x, p.y);
       if (d < bd) { bd = d; best = v; }
     }
@@ -387,7 +388,12 @@ function playerCarUpdate(g, dt, input) {
   else v.speed *= Math.pow(0.35, dt);
   v.speed = clamp(v.speed, -maxV * 0.5, maxV);
   const steer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-  v.ang += steer * 2.7 * dt * clamp(Math.abs(v.speed) / 130, 0, 1) * (v.speed >= 0 ? 1 : -1);
+  if (input.handbrake) {
+    v.ang += steer * 3.6 * dt * clamp(Math.abs(v.speed) / 110, 0, 1) * (v.speed >= 0 ? 1 : -1);
+    v.speed *= Math.pow(0.2, dt);
+  } else {
+    v.ang += steer * 2.7 * dt * clamp(Math.abs(v.speed) / 130, 0, 1) * (v.speed >= 0 ? 1 : -1);
+  }
   v.ang = ((v.ang + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
 
   const fx = Math.cos(v.ang), fy = Math.sin(v.ang);
@@ -400,6 +406,7 @@ function playerCarUpdate(g, dt, input) {
     if (impact > 190) {
       g.player.health -= (impact - 190) / 9;
       ev(g, "crash");
+      damageVehicle(g, v, (impact - 190) / 6, false);
       floaterAt(g, v.x, v.y - 30, "CRASH! -" + Math.round((impact - 190) / 9), "#ff8888");
     }
     v.speed *= -0.25;
@@ -420,6 +427,8 @@ function playerCarUpdate(g, dt, input) {
       v.x -= nx * push * 0.5; v.y -= ny * push * 0.5;
       if (Math.abs(v.speed) > 120) {
         ev(g, "crash");
+        damageVehicle(g, o, Math.abs(v.speed) / 14, true);
+        damageVehicle(g, v, Math.abs(v.speed) / 20, false);
         if (o.mode === "police") addWanted(g, 1, "RAMMED THE POLICE!");
         else { addWanted(g, 0.25); floaterAt(g, o.x, o.y - 26, pick(HONK_WORDS), "#ffd977"); }
       }
@@ -436,6 +445,113 @@ function playerCarUpdate(g, dt, input) {
       }
     }
   }
+}
+
+// ---------------- combat ----------------
+function killPed(g, pd) {
+  if (pd.dead) return;
+  pd.dead = true;
+  pd.flee = 0;
+  addWanted(g, 1, "MURDER!");
+  ev(g, "jep");
+}
+function damageVehicle(g, v, amount, fromPlayer) {
+  if (v.mode === "wrecked" || v.mode === "remove") return;
+  if (v.hp === undefined) v.hp = 100;
+  v.hp -= amount;
+  if (v.hp <= 0) explodeVehicle(g, v, fromPlayer);
+}
+function explodeVehicle(g, v, fromPlayer) {
+  v.mode = "wrecked";
+  v.speed = 0;
+  v.wreckT = 0;
+  ev(g, "explosion", { x: v.x, y: v.y });
+  if (v.type === "police") addWanted(g, fromPlayer ? 2.5 : 0, "COP CAR DOWN!");
+  else if (fromPlayer) addWanted(g, 1.5, "VEHICLE DESTROYED!");
+  const all = g.vehicles.concat(g.copCars);
+  for (const o of all) {
+    if (o === v || o.mode === "wrecked" || o.mode === "remove") continue;
+    const d = dist(o.x, o.y, v.x, v.y);
+    if (d < 90) damageVehicle(g, o, (90 - d) / 3, fromPlayer && o !== g.player.vehicle);
+  }
+  if (g.player.vehicle === v) {
+    g.player.health -= 30;
+    g.player.vehicle = null;
+    g.player.onFoot = true;
+    g.player.x = clamp(v.x + 30, 20, WORLD_W - 20);
+    g.player.y = clamp(v.y + 30, 20, WORLD_H - 20);
+    floaterAt(g, g.player.x, g.player.y - 30, "ABANDON SHIP!", "#ff5252");
+  }
+  if (dist(g.player.x, g.player.y, v.x, v.y) < 60) g.player.health -= 20;
+  for (const pd of g.peds) if (!pd.dead && dist(pd.x, pd.y, v.x, v.y) < 55) killPed(g, pd);
+}
+function shootingUpdate(g, dt, input) {
+  const p = g.player;
+  if (g.fireCd > 0) g.fireCd -= dt;
+  if (!p.onFoot || !input.fire || g.fireCd > 0) return;
+  g.fireCd = 0.28;
+  const range = 240, aim = p.ang;
+  let best = null, bd = range, hitType = null;
+  const scan = (list, type) => {
+    for (const o of list) {
+      if (!o || o.mode === "wrecked" || o.mode === "remove") continue;
+      if (type === "ped" && o.dead) continue;
+      if (type === "vehicle" && o === p.vehicle) continue;
+      const d = dist(o.x, o.y, p.x, p.y);
+      if (d > bd) continue;
+      const a = Math.atan2(o.y - p.y, o.x - p.x);
+      const diff = Math.abs(((a - aim) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+      if (diff > 0.72) continue;
+      best = o; bd = d; hitType = type;
+    }
+  };
+  scan(g.peds, "ped");
+  scan(g.vehicles, "vehicle");
+  scan(g.copCars, "vehicle");
+  scan(g.cops, "cop");
+  ev(g, "gunshot", { x: p.x, y: p.y, ax: p.x + Math.cos(aim) * 240, ay: p.y + Math.sin(aim) * 240, hit: !!best, hx: best ? best.x : 0, hy: best ? best.y : 0 });
+  if (!best) return;
+  if (hitType === "ped") {
+    killPed(g, best);
+    floaterAt(g, best.x, best.y - 24, "HIT", "#ff5252");
+  } else if (hitType === "vehicle") {
+    damageVehicle(g, best, 16, true);
+    floaterAt(g, best.x, best.y - 24, "HIT", "#ffffff");
+  } else {
+    best.health = (best.health === undefined ? 40 : best.health) - 16;
+    if (best.health <= 0) {
+      g.cops.splice(g.cops.indexOf(best), 1);
+      addWanted(g, 2, "COP KILLED!");
+      ev(g, "jep");
+    } else {
+      addWanted(g, 1, "SHOT AT POLICE!");
+      floaterAt(g, best.x, best.y - 24, "HIT", "#ffffff");
+    }
+  }
+}
+function copShootingUpdate(g, dt) {
+  if (Math.floor(g.wanted) < 2) return;
+  if (g.copShootCd > 0) g.copShootCd -= dt;
+  const p = g.player;
+  const shooters = g.cops.filter((c) => dist(c.x, c.y, p.x, p.y) < 260);
+  if (!shooters.length || g.copShootCd > 0) return;
+  g.copShootCd = 1.3;
+  const c = pick(shooters);
+  const hit = Math.random() < 0.5;
+  const a = Math.atan2(p.y - c.y, p.x - c.x) + (hit ? 0 : rand(-0.4, 0.4));
+  const mx = hit ? p.x : p.x + Math.cos(a) * 30, my = hit ? p.y : p.y + Math.sin(a) * 30;
+  ev(g, "gunshot", { x: c.x, y: c.y, ax: mx, ay: my, hit, hx: mx, hy: my, fromPolice: true });
+  if (hit) {
+    p.health -= 6 + g.wanted * 1.5;
+    floaterAt(g, p.x, p.y - 40, "SHOT!", "#ff5252");
+    ev(g, "crash");
+  }
+}
+function wasted(g) {
+  const p = g.player;
+  p.money = Math.max(0, p.money - 150);
+  showBig(g, "WASTED", "You woke up at the hospital. -\u20b9150", 2.6);
+  resetPlayer(g, false);
 }
 
 // ---------------- services ----------------
@@ -593,20 +709,27 @@ export function update(g, dt, input) {
   for (const v of g.vehicles) if (v.mode === "traffic") trafficUpdate(g, v, dt);
   for (const pd of g.peds) pedUpdate(g, pd, dt);
   policeUpdate(g, dt);
+  shootingUpdate(g, dt, input);
+  copShootingUpdate(g, dt);
   serviceUpdate(g);
   missionUpdate(g, dt);
 
   if (Math.random() < 0.02) ev(g, "honk");
   if (g.wanted === 0 && p.health < 100) p.health = Math.min(100, p.health + 5 * dt);
-  if (p.health <= 0) {
-    showBig(g, "WASTED", "You woke up at the hospital. -₹150", 2.6);
-    p.money = Math.max(0, p.money - 150);
-    resetPlayer(g, false);
-  }
+  if (p.health <= 0) wasted(g);
   if (g.bigT > 0) g.bigT -= dt;
 
+  for (const v of g.vehicles.concat(g.copCars)) {
+    if (v.mode === "wrecked") {
+      v.wreckT = (v.wreckT || 0) + dt;
+      if (v.wreckT > 14) v.mode = "remove";
+    }
+  }
+  g.vehicles = g.vehicles.filter((v) => v.mode !== "remove");
+  g.copCars = g.copCars.filter((v) => v.mode !== "remove");
   g.vehicles = g.vehicles.filter((v) => v.mode !== "traffic" || (v.x > -80 && v.x < WORLD_W + 80 && v.y > -80 && v.y < WORLD_H + 80));
   while (g.vehicles.length < 40 + g.level * 4) spawnTraffic(g);
-  g.peds = g.peds.filter((pd) => !pd.dead || Math.random() > 0.98);
+  for (const pd of g.peds) if (pd.dead) pd.deadT = (pd.deadT || 0) + dt;
+  g.peds = g.peds.filter((pd) => !pd.dead || pd.deadT < 8);
   while (g.peds.length < 30 + g.level * 2) spawnPed(g);
 }

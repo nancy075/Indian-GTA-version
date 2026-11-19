@@ -36,6 +36,36 @@ function crashSound() {
   const g2 = AC.createGain(); g2.gain.value = 0.3;
   src.connect(g2); g2.connect(master); src.start();
 }
+function gunshotSound() {
+  if (!AC) return;
+  const len = Math.floor(AC.sampleRate * 0.08);
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 1100;
+  const g2 = AC.createGain(); g2.gain.value = 0.5;
+  src.connect(f); f.connect(g2); g2.connect(master); src.start();
+}
+function explosionSound() {
+  if (!AC) return;
+  const len = Math.floor(AC.sampleRate * 0.9);
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.6);
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 380;
+  const g2 = AC.createGain(); g2.gain.value = 0.8;
+  src.connect(f); f.connect(g2); g2.connect(master); src.start();
+  const o = AC.createOscillator(), og = AC.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(90, AC.currentTime);
+  o.frequency.exponentialRampToValueAtTime(32, AC.currentTime + 0.5);
+  og.gain.setValueAtTime(0.5, AC.currentTime);
+  og.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.7);
+  o.connect(og); og.connect(master); o.start(); o.stop(AC.currentTime + 0.75);
+}
+
 function initAudio() {
   if (AC) return;
   AC = new (window.AudioContext || window.webkitAudioContext)();
@@ -82,6 +112,107 @@ function toggleMute(g) {
   muted = !muted;
   master.gain.value = muted ? 0 : 0.6;
   toast(g, muted ? "SOUND OFF" : "SOUND ON");
+}
+
+// ---------------- desi radio (procedural music) ----------------
+let _noiseBuf = null;
+function noiseBuf() {
+  if (_noiseBuf) return _noiseBuf;
+  const len = Math.floor(AC.sampleRate * 0.2);
+  _noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = _noiseBuf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return _noiseBuf;
+}
+const RADIO_STATIONS = [
+  { name: "\u092e\u0941\u0902\u092c\u0908 MASALA FM", bpm: 148, root: 587.33, scale: [0, 2, 3, 7, 9],  bass: [0, 0, 3, 5] },
+  { name: "MIRCHI DHAMAKA", bpm: 126, root: 523.25, scale: [0, 3, 5, 7, 10], bass: [0, 5, 3, 7] },
+  { name: "GULLY ROCK 101", bpm: 164, root: 493.88, scale: [0, 2, 4, 7, 9],  bass: [0, 0, 7, 5] }
+];
+let radioOn = false, stationIdx = 0, radioStep = 0, radioNext = 0, radioTimer = null;
+function kickAt(t) {
+  const o = AC.createOscillator(), g2 = AC.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+  g2.gain.setValueAtTime(0.5, t);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+  o.connect(g2); g2.connect(master);
+  o.start(t); o.stop(t + 0.2);
+}
+function hatAt(t) {
+  const src = AC.createBufferSource(); src.buffer = noiseBuf();
+  const f = AC.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 6500;
+  const g2 = AC.createGain();
+  g2.gain.setValueAtTime(0.07, t);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+  src.connect(f); f.connect(g2); g2.connect(master);
+  src.start(t); src.stop(t + 0.05);
+}
+function tablaAt(t, hi) {
+  const o = AC.createOscillator(), g2 = AC.createGain();
+  o.type = "triangle";
+  o.frequency.value = hi ? 466 : 233;
+  g2.gain.setValueAtTime(hi ? 0.16 : 0.2, t);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + (hi ? 0.09 : 0.16));
+  o.connect(g2); g2.connect(master);
+  o.start(t); o.stop(t + 0.2);
+}
+function bassAt(t, semi) {
+  const o = AC.createOscillator(), g2 = AC.createGain();
+  o.type = "sawtooth";
+  o.frequency.value = 110 * Math.pow(2, semi / 12);
+  const f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 340;
+  g2.gain.setValueAtTime(0.13, t);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+  o.connect(f); f.connect(g2); g2.connect(master);
+  o.start(t); o.stop(t + 0.26);
+}
+function pluckAt(t, freq, vol) {
+  const o = AC.createOscillator(), g2 = AC.createGain();
+  o.type = "sine";
+  o.frequency.value = freq;
+  g2.gain.setValueAtTime(vol, t);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+  o.connect(g2); g2.connect(master);
+  o.start(t); o.stop(t + 0.14);
+}
+function scheduleRadio() {
+  if (!AC || !radioOn || muted) return;
+  const st = RADIO_STATIONS[stationIdx];
+  const stepDur = 60 / st.bpm / 2;
+  while (radioNext < AC.currentTime + 0.3) {
+    const s = radioStep % 16;
+    const t = radioNext;
+    if (s % 8 === 0 || s === 10) kickAt(t);
+    if (s % 4 === 0 && s !== 8) kickAt(t + stepDur * 0.5);
+    if (s % 2 === 1) hatAt(t);
+    if (s === 4 || s === 12) tablaAt(t, false);
+    if (s === 6 || s === 14) tablaAt(t, true);
+    if (s % 8 === 0 || s % 8 === 5) bassAt(t, st.bass[Math.floor(s / 4) % 4]);
+    if (Math.random() < 0.55) {
+      const deg = st.scale[Math.floor(Math.random() * st.scale.length)];
+      pluckAt(t, st.root * Math.pow(2, deg / 12), 0.09);
+      if (Math.random() < 0.3) pluckAt(t + stepDur * 0.5, st.root * 2 * Math.pow(2, deg / 12), 0.06);
+    }
+    radioNext += stepDur;
+    radioStep++;
+  }
+}
+function toggleRadio(g, silent) {
+  radioOn = !radioOn;
+  if (radioOn) {
+    if (!AC) initAudio();
+    radioNext = AC.currentTime + 0.1; radioStep = 0;
+    if (!radioTimer) radioTimer = setInterval(scheduleRadio, 120);
+    if (!silent) toast(g, "RADIO ON \u2014 " + RADIO_STATIONS[stationIdx].name);
+  } else if (!silent) toast(g, "RADIO OFF");
+}
+function cycleStation(g) {
+  if (!radioOn) { toggleRadio(g); return; }
+  stationIdx = (stationIdx + 1) % RADIO_STATIONS.length;
+  radioStep = 0; radioNext = AC.currentTime + 0.1;
+  toast(g, "RADIO \u2014 " + RADIO_STATIONS[stationIdx].name);
 }
 
 // ---------------- three.js setup ----------------
@@ -311,9 +442,58 @@ scene.add(bankBeacon);
 const pnsBeacon = makeBeacon(0x2ecc71); pnsBeacon.scale.setScalar(0.5); scene.add(pnsBeacon);
 const chaiBeacon = makeBeacon(0xff9800); chaiBeacon.scale.setScalar(0.5); scene.add(chaiBeacon);
 
+// ---------------- tracers & explosions ----------------
+const tracers = [];
+for (let i = 0; i < 14; i++) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 3));
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.9 }));
+  line.visible = false;
+  scene.add(line);
+  tracers.push({ line, life: 0 });
+}
+function spawnTracer(x, y, ax, ay) {
+  const t = tracers.find((t) => !t.line.visible) || tracers[0];
+  const pos = t.line.geometry.attributes.position;
+  pos.setXYZ(0, x, 1.4, y); pos.setXYZ(1, ax, 1.4, ay);
+  pos.needsUpdate = true;
+  t.line.visible = true;
+  t.line.material.opacity = 0.9;
+  t.life = 0.09;
+}
+const explosions = [];
+for (let i = 0; i < 6; i++) {
+  const s = new THREE.Mesh(new THREE.SphereGeometry(5, 14, 10),
+    new THREE.MeshBasicMaterial({ color: 0xff7b1c, transparent: true, opacity: 0.95 }));
+  s.visible = false;
+  scene.add(s);
+  explosions.push({ mesh: s, life: 0 });
+}
+function spawnExplosion(x, y) {
+  const e = explosions.find((e) => !e.mesh.visible) || explosions[0];
+  e.mesh.position.set(x, 3, y);
+  e.mesh.scale.setScalar(0.3);
+  e.mesh.material.opacity = 0.95;
+  e.mesh.visible = true;
+  e.life = 0.5;
+}
+function fxUpdate(dt) {
+  for (const t of tracers) if (t.line.visible) {
+    t.life -= dt;
+    if (t.life <= 0) t.line.visible = false;
+  }
+  for (const e of explosions) if (e.mesh.visible) {
+    e.life -= dt;
+    if (e.life <= 0) { e.mesh.visible = false; continue; }
+    e.mesh.scale.setScalar(0.3 + (1 - e.life / 0.5) * 2.6);
+    e.mesh.material.opacity = 0.95 * (1 - e.life / 0.5);
+  }
+}
+
 // ---------------- entity sync maps ----------------
 const carMeshes = new Map();   // vehicle obj -> mesh
 const pedMeshes = new Map();
+const copMeshes = new Map();
 const footPlayer = new THREE.Group();
 (function buildFootPlayer() {
   const body = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.4, 9, 8), new THREE.MeshLambertMaterial({ color: 0x4f83e0 }));
@@ -330,6 +510,39 @@ const arrowCone = new THREE.Mesh(new THREE.ConeGeometry(2.6, 7, 4), new THREE.Me
 arrowCone.rotation.z = -Math.PI / 2;
 arrowGrp.add(arrowCone);
 scene.add(arrowGrp);
+
+function syncCopMeshes(g) {
+  if (g.wanted === 0) {
+    for (const [, m] of copMeshes) scene.remove(m);
+    copMeshes.clear();
+    return;
+  }
+  const seen = new Set();
+  for (const c of g.cops) {
+    seen.add(c);
+    let m = copMeshes.get(c);
+    if (!m) {
+      const grp = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 6.5, 7),
+        new THREE.MeshLambertMaterial({ color: 0x5a6b4a }));
+      body.position.y = 3.2;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(1.9, 8, 6),
+        new THREE.MeshLambertMaterial({ color: 0xb9855c }));
+      head.position.y = 7.8;
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.8, 8),
+        new THREE.MeshLambertMaterial({ color: 0x3d4d33 }));
+      cap.position.y = 9;
+      grp.add(body); grp.add(head); grp.add(cap);
+      scene.add(grp);
+      copMeshes.set(c, grp);
+      m = grp;
+    }
+    const ang = Math.atan2(g.player.y - c.y, g.player.x - c.x);
+    m.position.set(c.x, 0, c.y);
+    m.rotation.y = Math.PI / 2 - ang;
+  }
+  for (const [c, m] of copMeshes) if (!seen.has(c)) { scene.remove(m); copMeshes.delete(c); }
+}
 
 function syncCarMeshes(g) {
   const all = g.vehicles.concat(g.copCars);
@@ -353,6 +566,12 @@ function syncCarMeshes(g) {
     }
     m.position.set(v.x, 0, v.y);
     m.rotation.y = Math.PI / 2 - v.ang;
+    if (v.mode === "wrecked" && !m.userData.wrecked) {
+      m.userData.wrecked = true;
+      m.traverse((c) => { if (c.isMesh && c.material && c.material.color) c.material.color.multiplyScalar(0.3); });
+      m.rotation.z = 0.08;
+      if (m.userData.siren) m.userData.siren.visible = false;
+    }
     if (m.userData.siren) {
       m.userData.siren.visible = Math.floor(g.wanted) >= 1;
       m.userData.siren.material.color.set(Math.floor(performance.now() / 220) % 2 ? 0xff2222 : 0x2b6bff);
@@ -365,7 +584,6 @@ function syncCarMeshes(g) {
 function syncPedMeshes(g) {
   const seen = new Set();
   for (const p of g.peds) {
-    if (p.dead) continue;
     seen.add(p);
     let m = pedMeshes.get(p);
     if (!m) {
@@ -380,8 +598,14 @@ function syncPedMeshes(g) {
       pedMeshes.set(p, grp);
       m = grp;
     }
-    m.position.set(p.x, 0, p.y);
-    m.rotation.y = Math.PI / 2 - p.vax * (Math.PI / 2);
+    if (p.dead) {
+      m.position.set(p.x, 0.6, p.y);
+      m.rotation.z = Math.PI / 2;
+    } else {
+      m.rotation.z = 0;
+      m.position.set(p.x, 0, p.y);
+      m.rotation.y = Math.PI / 2 - p.vax * (Math.PI / 2);
+    }
   }
   const dead = [...pedMeshes.keys()].filter((p) => !seen.has(p));
   for (const p of dead) { scene.remove(pedMeshes.get(p)); pedMeshes.delete(p); }
@@ -451,6 +675,15 @@ function hudUpdate(g) {
   $("health").style.width = clamp(g.player.health, 0, 100) + "%";
   $("health").style.background = g.player.health > 50 ? "linear-gradient(90deg,#6ecc6e,#a3e29f)"
     : g.player.health > 25 ? "linear-gradient(90deg,#e8c34a,#f3da82)" : "linear-gradient(90deg,#e05252,#ff8a80)";
+  const car = !g.player.onFoot && g.player.vehicle;
+  if (car && car.spec) {
+    const hpMax = car.spec.hp || 100;
+    const frac = clamp((car.hp ?? hpMax) / hpMax, 0, 1);
+    $("vehwrap").style.display = "block";
+    $("vehbar").style.width = frac * 100 + "%";
+    $("vehbar").style.background = frac > 0.4 ? "linear-gradient(90deg,#4aa3ff,#8ec9ff)"
+      : "linear-gradient(90deg,#e05252,#ff8a80)";
+  } else $("vehwrap").style.display = "none";
 }
 function toast(g, text) {
   const div = document.createElement("div");
@@ -462,13 +695,15 @@ function toast(g, text) {
 const keys = {};
 let camMode = "chase";   // "chase" | "top"
 const ray = new THREE.Raycaster();
-const input = { up: false, down: false, left: false, right: false, sprint: false, enter: false, horn: false };
+const input = { up: false, down: false, left: false, right: false, sprint: false, enter: false, horn: false, fire: false, handbrake: false };
 function readInput() {
   input.up = !!(keys["w"] || keys["arrowup"]);
   input.down = !!(keys["s"] || keys["arrowdown"]);
   input.left = !!(keys["a"] || keys["arrowleft"]);
   input.right = !!(keys["d"] || keys["arrowright"]);
   input.sprint = !!keys["shift"];
+  input.fire = !!keys[" "];
+  input.handbrake = !g.player.onFoot && !!keys[" "];
 }
 addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
@@ -477,6 +712,7 @@ addEventListener("keydown", (e) => {
   if (k === "e" && g.mode === "play") input.enter = true;
   if (k === "h" && g.mode === "play") input.horn = true;
   if (k === "m") toggleMute(g);
+  if (k === "r" && g.mode === "play") { if (radioOn) cycleStation(g); else toggleRadio(g); }
   if (k === "v") { camMode = camMode === "chase" ? "top" : "chase"; toast(g, camMode === "top" ? "CITY VIEW" : "CHASE CAM"); }
   if (k === "p" && g.mode !== "intro") { g.mode = g.mode === "play" ? "pause" : "play"; toast(g, g.mode === "pause" ? "PAUSED" : "RESUMED"); }
 });
@@ -497,6 +733,7 @@ const camPos = new THREE.Vector3(g.player.x, 30, g.player.y + 40);
 function frame() {
   requestAnimationFrame(frame);
   const dt = clock.getDelta();
+  fxUpdate(dt);
   if (g.mode === "play") {
     readInput();
     update(g, dt, input);
@@ -574,6 +811,7 @@ function frame() {
 
   syncCarMeshes(g);
   syncPedMeshes(g);
+  syncCopMeshes(g);
   audioUpdate(g);
   hudUpdate(g);
   drawMinimap(g);
@@ -586,7 +824,9 @@ function processEvents(g) {
     if (e.type === "honk") honkSound();
     else if (e.type === "crash") crashSound();
     else if (e.type === "cash") cashSound();
-    else if (e.type === "jep") jepSound();
+    else if (e.type === "jep") { jepSound(); if (!radioOn) toggleRadio(g, true); }
+    else if (e.type === "gunshot") { gunshotSound(); spawnTracer(e.x, e.y, e.ax, e.ay); }
+    else if (e.type === "explosion") { explosionSound(); spawnExplosion(e.x, e.y); }
     else if (e.type === "levelup") levelSound();
     else if (e.type === "floater") toast(g, e.text);
     else if (e.type === "big") big = e;

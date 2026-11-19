@@ -83,9 +83,9 @@ All game logic lives in `js/game.js` (~700 lines) — tweak `TILE`, `ROAD_STEP`,
 
 | | 2D (this folder) | 3D (`/3d/`) |
 |---|---|---|
-| Tech | Vanilla Canvas | Three.js (CDN, no build) |
-| View | Top-down GTA1-style | Low-poly chase-cam GTA-style |
-| Feature set | Full (missions, levels, cops, services, day/night) | Same logic, 3D world |
+| Tech | Vanilla Canvas | Three.js (vendored, no build) |
+| View | Top-down GTA1-style | Low-poly chase-cam GTA-2/3-style |
+| Feature set | Missions, levels, cops, services, day/night | + combat: pistol, car damage, explosions, cop gunfights |
 
 ### Run the 3D version
 ES modules need a local server (double-clicking `3d/index.html` will show a
@@ -98,8 +98,23 @@ npx serve .              # open http://localhost:3000/3d/
 python3 -m http.server 8000   # open http://localhost:8000/3d/
 ```
 
-3D extras: cinematic city flyover on the start screen (`V` toggles a full
-top-down city view), occlusion-aware chase camera that never clips through
-buildings, instanced buildings with window textures, street lamps + trees,
-filmic tone mapping, glowing mission beacons, headlights & fond streetlamps
-at night, glass HUD.
+3D extras aiming for that GTA 2/3 feel:
+
+- **Combat** — SPACE on foot fires a pistol with gentle auto-aim (tracers,
+  floating hit markers). Wrecks attract cops; killing anyone adds stars.
+- **Vehicle damage** — every vehicle has HP shown as a blue bar in the HUD.
+  Cars take damage from crashing, ramming and gunfire, then explode with
+  chain reactions (park near another car at your own risk). You are thrown
+  clear of your car before it blows.
+- **Cops fight back** — at 2 stars and above foot cops open fire at you.
+- **Handbrake** — SPACE in a car = drift (steer harder, scrub speed).
+- **Desi radio** — entering a car auto-tunes the radio; `R` cycles stations
+  (MASALA FM, MIRCHI DHAMAKA, GULLY ROCK 101). Procedural tabla-kick-hat
+  grooves, no audio files needed.
+- **GTA HUD** — money/level/stars top-right, circular radar bottom-left,
+  mission tracker, health + vehicle bars.
+- Plus: cinematic city flyover on the start screen (`V` toggles a full
+  top-down city view), occlusion-aware chase camera that never clips through
+  buildings, instanced buildings with window textures, street lamps + trees,
+  filmic tone mapping, glowing mission beacons, headlights and streetlamps
+  at night, on-foot cops visible in the world.
