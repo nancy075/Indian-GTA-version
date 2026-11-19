@@ -14,7 +14,7 @@ export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
 export const grid = new Uint8Array(COLS * ROWS);
-const gi = (c, r) => r * COLS + c;
+export const gi = (c, r) => r * COLS + c;
 export function tileAt(x, y) {
   const c = Math.floor(x / TILE), r = Math.floor(y / TILE);
   if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return T_BUILDING;
