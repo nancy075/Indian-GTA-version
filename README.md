@@ -88,7 +88,9 @@ All game logic lives in `js/game.js` (~700 lines) — tweak `TILE`, `ROAD_STEP`,
 | Feature set | Full (missions, levels, cops, services, day/night) | Same logic, 3D world |
 
 ### Run the 3D version
-ES modules need a server (and internet for the three.js CDN):
+ES modules need a local server (double-clicking `3d/index.html` will show a
+helpful "needs a server" screen — browsers block modules on `file://`).
+Three.js is vendored at `3d/vendor/`, so **no internet needed** at run time:
 
 ```bash
 npx serve .              # open http://localhost:3000/3d/

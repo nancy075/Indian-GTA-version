@@ -44,8 +44,24 @@
     </div>
   </div>
 
+  <script>
+    if (location.protocol === "file:") {
+      window.addEventListener("DOMContentLoaded", () => {
+        const d = document.createElement("div");
+        d.style.cssText = "position:fixed;inset:0;z-index:99;background:#0d0a12;color:#ffd977;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:18px;line-height:2;";
+        d.innerHTML = "<div><b style='font-size:24px'>3D version needs a local server</b><br><br>" +
+          "In a terminal, inside the game folder run:<br><br>" +
+          "<code style='background:#241c2c;padding:8px 16px;border-radius:8px'>npx serve .</code> &nbsp;or&nbsp; " +
+          "<code style='background:#241c2c;padding:8px 16px;border-radius:8px'>python3 -m http.server 8000</code><br><br>" +
+          "Then open <b>http://localhost:3000/3d/</b> (or :8000/3d/) in your browser.<br>" +
+          "<span style='color:#97907f'>(Browsers block ES modules on file:// pages — that's why it looks blank.)</span><br><br>" +
+          "Want to right now? The <b>2D game still works</b> — open index.html at the root.</div>";
+        document.body.appendChild(d);
+      });
+    }
+  </script>
   <script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.170.0/build/three.module.js" } }
+    { "imports": { "three": "./vendor/three.module.js" } }
   </script>
   <script type="module" src="main.js"></script>
 </body>
